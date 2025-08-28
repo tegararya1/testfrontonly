@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Monitoring Ternak</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .page { display: none; }
+        .page.active { display: block; }
+        .student-card:hover, .cage-card:hover {
+            transform: translateY(-2px);
+            transition: transform 0.2s ease;
+        }
+        
+        /* Popup Modal Styles */
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .popup-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            text-align: center;
+            max-width: 400px;
+            margin: 1rem;
+            animation: popupSlide 0.3s ease-out;
+        }
+        
+        @keyframes popupSlide {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-green-50 min-h-screen">
+    <!-- Database Storage -->
+    <script>
+        // Simple localStorage database
+        const DB = {
+            students: [
+                {id: 1, name: "Ahmad Rizki", photo: "👨‍🎓"},
+                {id: 2, name: "Siti Nurhaliza", photo: "👩‍🎓"},
+                {id: 3, name: "Budi Santoso", photo: "👨‍🎓"},
+                {id: 4, name: "Dewi Sartika", photo: "👩‍🎓"},
+                {id: 5, name: "Eko Prasetyo", photo: "👨‍🎓"},
+                {id: 6, name: "Fitri Handayani", photo: "👩‍🎓"},
+                {id: 7, name: "Gilang Ramadhan", photo: "👨‍🎓"},
+                {id: 8, name: "Hani Safitri", photo: "👩‍🎓"},
+                {id: 9, name: "Indra Gunawan", photo: "👨‍🎓"},
+                {id: 10, name: "Jihan Aulia", photo: "👩‍🎓"}
+            ],
+            cages: [
+                {id: 1, name: "Kandang A1", icon: "🐑"},
+                {id: 2, name: "Kandang A2", icon: "🐑"},
+                {id: 3, name: "Kandang B1", icon: "🐑"},
+                {id: 4, name: "Kandang B2", icon: "🐑"},
+                {id: 5, name: "Kandang C1", icon: "🐑"},
+                {id: 6, name: "Kandang C2", icon: "🐑"},
+                {id: 7, name: "Kandang D1", icon: "🐑"},
+                {id: 8, name: "Kandang D2", icon: "🐑"},
+                {id: 9, name: "Kandang E1", icon: "🐑"},
+                {id: 10, name: "Kandang E2", icon: "🐑"}
+            ],
+            records: JSON.parse(localStorage.getItem('livestockRecords') || '[]'),
+            
+            saveRecord: function(record) {
+                this.records.push(record);
+                localStorage.setItem('livestockRecords', JSON.stringify(this.records));
+            },
+            
+            getRecordsByCage: function(cageId) {
+                return this.records.filter(r => r.cageId === cageId);
+            },
+            
+            updateStudent: function(id, name, photo) {
+                const student = this.students.find(s => s.id === id);
+                if (student) {
+                    student.name = name;
+                    student.photo = photo;
+                }
+            }
+        };
+
+        let currentStudent = null;
+        let currentCage = null;
+    </script>
+
+    <!-- Login Page -->
+    <div id="loginPage" class="page active">
+        <div class="min-h-screen flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+                <div class="text-center mb-8">
+                    <div class="text-6xl mb-4">🐑</div>
+                    <h1 class="text-3xl font-bold text-gray-800 mb-2">Sistem Monitoring</h1>
+                    <p class="text-gray-600">Peternakan Domba</p>
+                </div>
+                
+                <form onsubmit="login(event)" class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                        <input type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Masukkan username">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                        <input type="password" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Masukkan password">
+                    </div>
+                    
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200">
+                        Masuk
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student List Page -->
+    <div id="studentPage" class="page">
+        <div class="min-h-screen p-6 relative">
+            <div class="max-w-6xl mx-auto">
+                <div class="bg-white rounded-2xl shadow-lg p-8">
+                    <div class="flex justify-between items-center mb-8">
+                        <h1 class="text-3xl font-bold text-gray-800">Daftar Siswa</h1>
+                        <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">
+                            Keluar
+                        </button>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6" id="studentGrid">
+                        <!-- Students will be loaded here -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Edit Button - Bottom Right -->
+            <button onclick="showEditMode()" class="fixed bottom-8 right-8 bg-orange-500 hover:bg-orange-600 text-white p-4 rounded-full shadow-lg transition duration-200">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Edit Student Page -->
+    <div id="editStudentPage" class="page">
+        <div class="min-h-screen p-6">
+            <div class="max-w-2xl mx-auto">
+                <div class="bg-white rounded-2xl shadow-lg p-8">
+                    <div class="flex justify-between items-center mb-8">
+                        <h1 class="text-3xl font-bold text-gray-800">Edit Siswa</h1>
+                        <button onclick="showStudentPage()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                            Kembali
+                        </button>
+                    </div>
+                    
+                    <form onsubmit="saveStudent(event)" class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Nama Siswa</label>
+                            <input type="text" id="editStudentName" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Foto (Emoji)</label>
+                            <div class="grid grid-cols-5 gap-3 mb-4">
+                                <button type="button" onclick="selectEmoji('👨‍🎓')" class="emoji-btn text-4xl p-3 border-2 border-gray-300 rounded-lg hover:border-blue-500">👨‍🎓</button>
+                                <button type="button" onclick="selectEmoji('👩‍🎓')" class="emoji-btn text-4xl p-3 border-2 border-gray-300 rounded-lg hover:border-blue-500">👩‍🎓</button>
+                                <button type="button" onclick="selectEmoji('👨‍💼')" class="emoji-btn text-4xl p-3 border-2 border-gray-300 rounded-lg hover:border-blue-500">👨‍💼</button>
+                                <button type="button" onclick="selectEmoji('👩‍💼')" class="emoji-btn text-4xl p-3 border-2 border-gray-300 rounded-lg hover:border-blue-500">👩‍💼</button>
+                                <button type="button" onclick="selectEmoji('🧑‍🎓')" class="emoji-btn text-4xl p-3 border-2 border-gray-300 rounded-lg hover:border-blue-500">🧑‍🎓</button>
+                            </div>
+                            <input type="hidden" id="editStudentPhoto" required>
+                        </div>
+                        
+                        <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg">
+                            Simpan Perubahan
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cage Dashboard Page -->
+    <div id="cagePage" class="page">
+        <div class="min-h-screen p-6">
+            <div class="max-w-6xl mx-auto">
+                <div class="bg-white rounded-2xl shadow-lg p-8">
+                    <div class="flex justify-between items-center mb-8">
+                        <div>
+                            <h1 class="text-3xl font-bold text-gray-800">Dashboard Kandang</h1>
+                            <p class="text-gray-600" id="currentStudentName">Siswa: </p>
+                        </div>
+                        <button onclick="showStudentPage()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                            Kembali
+                        </button>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6" id="cageGrid">
+                        <!-- Cages will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cage Detail Page -->
+    <div id="cageDetailPage" class="page">
+        <div class="min-h-screen p-6">
+            <div class="max-w-4xl mx-auto">
+                <div class="bg-white rounded-2xl shadow-lg p-8">
+                    <div class="flex justify-between items-center mb-8">
+                        <div>
+                            <h1 class="text-3xl font-bold text-gray-800" id="cageDetailTitle">Detail Kandang</h1>
+                            <p class="text-gray-600" id="cageDetailStudent">Siswa: </p>
+                        </div>
+                        <button onclick="showCagePage()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                            Kembali
+                        </button>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <!-- Cage Info -->
+                        <div class="bg-gray-50 rounded-xl p-6">
+                            <div class="text-center mb-6">
+                                <div class="text-8xl mb-4" id="cageIcon">🐑</div>
+                                <h2 class="text-2xl font-bold text-gray-800" id="cageName">Kandang A1</h2>
+                            </div>
+                            
+                            <div class="space-y-4">
+                                <h3 class="text-lg font-semibold text-gray-700 mb-4">Status Kesehatan Hewan</h3>
+                                <div class="flex gap-4">
+                                    <button onclick="recordHealth(true)" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-4 px-6 rounded-lg transition duration-200">
+                                        ✅ Sehat
+                                    </button>
+                                    <button onclick="recordHealth(false)" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-4 px-6 rounded-lg transition duration-200">
+                                        ❌ Sakit
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Records -->
+                        <div class="bg-gray-50 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold text-gray-700 mb-4">Riwayat Pemeriksaan</h3>
+                            <div class="space-y-3 max-h-96 overflow-y-auto" id="recordsList">
+                                <!-- Records will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Popup -->
+    <div id="successPopup" class="popup-overlay" style="display: none;">
+        <div class="popup-content">
+            <div class="text-6xl mb-4" id="popupIcon">✅</div>
+            <h2 class="text-2xl font-bold mb-2" id="popupTitle">Berhasil!</h2>
+            <p class="text-gray-600 mb-6" id="popupMessage">Status kesehatan berhasil dicatat!</p>
+            <button onclick="closePopup()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg">
+                OK
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let editMode = false;
+
+        // Navigation functions
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+        }
+
+        function login(event) {
+            event.preventDefault();
+            showStudentPage();
+        }
+
+        function logout() {
+            currentStudent = null;
+            currentCage = null;
+            editMode = false;
+            showPage('loginPage');
+        }
+
+        function showStudentPage() {
+            showPage('studentPage');
+            editMode = false;
+            loadStudents();
+        }
+
+        function showEditMode() {
+            editMode = true;
+            loadStudents();
+        }
+
+        function showCagePage() {
+            showPage('cagePage');
+            document.getElementById('currentStudentName').textContent = `Siswa: ${currentStudent.name}`;
+            loadCages();
+        }
+
+        function showCageDetail(cageId) {
+            currentCage = DB.cages.find(c => c.id === cageId);
+            showPage('cageDetailPage');
+            
+            document.getElementById('cageDetailTitle').textContent = `Detail ${currentCage.name}`;
+            document.getElementById('cageDetailStudent').textContent = `Siswa: ${currentStudent.name}`;
+            document.getElementById('cageIcon').textContent = currentCage.icon;
+            document.getElementById('cageName').textContent = currentCage.name;
+            
+            loadRecords();
+        }
+
+        function showEditStudent(studentId) {
+            const student = DB.students.find(s => s.id === studentId);
+            currentStudent = student;
+            
+            document.getElementById('editStudentName').value = student.name;
+            document.getElementById('editStudentPhoto').value = student.photo;
+            
+            // Highlight selected emoji
+            document.querySelectorAll('.emoji-btn').forEach(btn => {
+                btn.classList.remove('border-blue-500', 'bg-blue-50');
+                btn.classList.add('border-gray-300');
+                if (btn.textContent === student.photo) {
+                    btn.classList.remove('border-gray-300');
+                    btn.classList.add('border-blue-500', 'bg-blue-50');
+                }
+            });
+            
+            showPage('editStudentPage');
+        }
+
+        // Load functions
+        function loadStudents() {
+            const grid = document.getElementById('studentGrid');
+            grid.innerHTML = '';
+            
+            DB.students.forEach(student => {
+                const card = document.createElement('div');
+                
+                if (editMode) {
+                    card.className = 'student-card bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-6 text-center cursor-pointer border-2 border-orange-200 hover:border-orange-300 transition duration-200';
+                    card.onclick = () => showEditStudent(student.id);
+                    card.innerHTML = `
+                        <div class="text-6xl mb-4">${student.photo}</div>
+                        <h3 class="font-semibold text-gray-800 mb-2">${student.name}</h3>
+                        <p class="text-sm text-orange-600">Klik untuk edit</p>
+                    `;
+                } else {
+                    card.className = 'student-card bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 text-center cursor-pointer border-2 border-transparent hover:border-blue-300 transition duration-200';
+                    card.onclick = () => selectStudent(student.id);
+                    card.innerHTML = `
+                        <div class="text-6xl mb-4">${student.photo}</div>
+                        <h3 class="font-semibold text-gray-800">${student.name}</h3>
+                    `;
+                }
+                
+                grid.appendChild(card);
+            });
+        }
+
+        function loadCages() {
+            const grid = document.getElementById('cageGrid');
+            grid.innerHTML = '';
+            
+            DB.cages.forEach(cage => {
+                const card = document.createElement('div');
+                card.className = 'cage-card bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 text-center cursor-pointer border-2 border-transparent hover:border-green-300 transition duration-200';
+                card.onclick = () => showCageDetail(cage.id);
+                card.innerHTML = `
+                    <div class="text-6xl mb-4">${cage.icon}</div>
+                    <h3 class="font-semibold text-gray-800">${cage.name}</h3>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function loadRecords() {
+            const recordsList = document.getElementById('recordsList');
+            const records = DB.getRecordsByCage(currentCage.id);
+            
+            recordsList.innerHTML = '';
+            
+            if (records.length === 0) {
+                recordsList.innerHTML = '<p class="text-gray-500 text-center py-8">Belum ada riwayat pemeriksaan</p>';
+                return;
+            }
+            
+            records.reverse().forEach(record => {
+                const recordDiv = document.createElement('div');
+                recordDiv.className = `p-4 rounded-lg border-l-4 ${record.isHealthy ? 'bg-green-50 border-green-500' : 'bg-red-50 border-red-500'}`;
+                recordDiv.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="font-semibold ${record.isHealthy ? 'text-green-700' : 'text-red-700'}">
+                                ${record.isHealthy ? '✅ Sehat' : '❌ Sakit'}
+                            </p>
+                            <p class="text-sm text-gray-600">Oleh: ${record.studentName}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm text-gray-500">${record.date}</p>
+                            <p class="text-sm text-gray-500">${record.time}</p>
+                        </div>
+                    </div>
+                `;
+                recordsList.appendChild(recordDiv);
+            });
+        }
+
+        // Action functions
+        function selectStudent(studentId) {
+            if (editMode) {
+                showEditStudent(studentId);
+            } else {
+                currentStudent = DB.students.find(s => s.id === studentId);
+                showCagePage();
+            }
+        }
+
+        function selectEmoji(emoji) {
+            document.getElementById('editStudentPhoto').value = emoji;
+            
+            // Update visual selection
+            document.querySelectorAll('.emoji-btn').forEach(btn => {
+                btn.classList.remove('border-blue-500', 'bg-blue-50');
+                btn.classList.add('border-gray-300');
+            });
+            
+            event.target.classList.remove('border-gray-300');
+            event.target.classList.add('border-blue-500', 'bg-blue-50');
+        }
+
+        function saveStudent(event) {
+            event.preventDefault();
+            
+            const name = document.getElementById('editStudentName').value;
+            const photo = document.getElementById('editStudentPhoto').value;
+            
+            DB.updateStudent(currentStudent.id, name, photo);
+            
+            alert('Data siswa berhasil diperbarui!');
+            showStudentPage();
+        }
+
+        function recordHealth(isHealthy) {
+            const now = new Date();
+            const record = {
+                id: Date.now(),
+                cageId: currentCage.id,
+                studentId: currentStudent.id,
+                studentName: currentStudent.name,
+                isHealthy: isHealthy,
+                date: now.toLocaleDateString('id-ID'),
+                time: now.toLocaleTimeString('id-ID'),
+                timestamp: now.getTime()
+            };
+            
+            DB.saveRecord(record);
+            
+            // Show custom popup
+            showSuccessPopup(isHealthy);
+            loadRecords();
+        }
+
+        function showSuccessPopup(isHealthy) {
+            const popup = document.getElementById('successPopup');
+            const icon = document.getElementById('popupIcon');
+            const title = document.getElementById('popupTitle');
+            const message = document.getElementById('popupMessage');
+            
+            if (isHealthy) {
+                icon.textContent = '✅';
+                icon.className = 'text-6xl mb-4 text-green-500';
+                title.textContent = `${currentCage.name} Sehat`;
+                title.className = 'text-2xl font-bold mb-2 text-green-700';
+            } else {
+                icon.textContent = '❌';
+                icon.className = 'text-6xl mb-4 text-red-500';
+                title.textContent = `${currentCage.name} Sakit`;
+                title.className = 'text-2xl font-bold mb-2 text-red-700';
+            }
+            
+            message.textContent = 'Status kesehatan berhasil dicatat!';
+            popup.style.display = 'flex';
+            
+            // Auto close after 2 seconds and return to cage dashboard
+            setTimeout(() => {
+                closePopup();
+                showCagePage();
+            }, 2000);
+        }
+
+        function closePopup() {
+            document.getElementById('successPopup').style.display = 'none';
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            showPage('loginPage');
+        });
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'975fc7b9f2b5fd2e',t:'MTc1NjM0MTg2Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
